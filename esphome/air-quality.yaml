@@ -1,0 +1,215 @@
+substitutions:
+  device_name: air-quality
+
+packages:
+  wifi: !include common/wifi.yaml
+  device_base: !include common/device_base.yaml
+  
+globals:
+  - id: max_brightness
+    type: float
+    restore_value: no
+    initial_value: '0.5'
+  - id: min_brightness
+    type: float
+    restore_value: no
+    initial_value: '0.1'
+
+esphome:
+  name: ${device_name}
+  comment: IKEA LaskaKit ESP-VINDRIKTNING ESP-32 I2C
+  on_boot:
+      - light.turn_on:
+          id: status_led
+          brightness: 0%
+
+esp32:
+  board: nodemcu-32s
+  framework:
+    type: arduino
+
+uart:
+  rx_pin: 16
+  tx_pin: 17
+  baud_rate: 9600
+  id: uart_2
+
+sensor:
+  - platform: pm1006
+    pm_2_5:
+      name: "Particulate Matter 2.5µm Concentration"
+      id: pm
+      accuracy_decimals: 1
+      on_value:
+        then:
+        - if:
+            condition:
+              lambda: 'return x < 30;'
+            then:
+              - light.addressable_set:
+                  id: status_led
+                  range_from: 0
+                  range_to: 0
+                  red: 0.0
+                  green: 1.0
+                  blue: 0.0
+                  color_brightness:  !lambda |-
+                    return id(sun_elevation).state > 0 ? 1.0 : 0.5;
+            else:
+            - if:
+                condition:
+                  lambda: 'return x > 90;'
+                then:
+                - light.addressable_set:
+                    id: status_led
+                    range_from: 0
+                    range_to: 0
+                    red: 1.0
+                    green: 0.0
+                    blue: 0.0
+                    color_brightness:  !lambda |-
+                      return id(sun_elevation).state > 0 ? 1.0 : 0.5;
+                else:
+                - light.addressable_set:
+                    id: status_led
+                    range_from: 0
+                    range_to: 0
+                    red: 1.0
+                    green: 0.72
+                    blue: 0.0
+                    color_brightness:  !lambda |-
+                      return id(sun_elevation).state > 0 ? 1.0 : 0.5;
+        - switch.turn_on: fan_delay
+    uart_id: uart_2
+    update_interval: 60s # koukni na fan_delay
+
+  - platform: scd4x
+    temperature:
+      name: "Temperature"
+      id: "Temperature"
+      
+    co2:
+      name: "CO2"
+      id: co2
+      on_value:
+        then:
+        - if:
+            condition:
+              lambda: 'return x < 1000;'
+            then:
+              - light.addressable_set:
+                  id: status_led
+                  range_from: 1
+                  range_to: 1
+                  red: 0.0
+                  green: 1.0
+                  blue: 0.0
+                  color_brightness:  !lambda |-
+                    return id(sun_elevation).state > 0 ? 1.0 : 0.5;
+            else:
+            - if:
+                condition:
+                  lambda: 'return x > 1500;'
+                then:
+                - light.addressable_set:
+                    id: status_led
+                    range_from: 1
+                    range_to: 1
+                    red: 1.0
+                    green: 0.0
+                    blue: 0.0
+                    color_brightness:  !lambda |-
+                      return id(sun_elevation).state > 0 ? 1.0 : 0.5;
+                else:
+                - light.addressable_set:
+                    id: status_led
+                    range_from: 1
+                    range_to: 1
+                    red: 1.0
+                    green: 0.72
+                    blue: 0.0
+                    color_brightness:  !lambda |-
+                      return id(sun_elevation).state > 0 ? 1.0 : 0.5;
+        
+    humidity:
+      name: "Humidity"    
+      id: humidity
+      on_value:
+        then:
+        - if:
+            condition:
+              lambda: 'return x < 30;'
+            then:
+              - light.addressable_set:
+                  id: status_led
+                  range_from: 2
+                  range_to: 2
+                  red: 1.0
+                  green: 0.0
+                  blue: 0.0
+                  color_brightness:  !lambda |-
+                    return id(sun_elevation).state > 0 ? 1.0 : 0.5;
+            else:
+            - if:
+                condition:
+                  lambda: 'return x > 60;'
+                then:
+                - light.addressable_set:
+                    id: status_led
+                    range_from: 2
+                    range_to: 2
+                    red: 0.0
+                    green: 0.0
+                    blue: 1.0
+                    color_brightness:  !lambda |-
+                      return id(sun_elevation).state > 0 ? 1.0 : 0.5;
+                else:
+                - light.addressable_set:
+                    id: status_led
+                    range_from: 2
+                    range_to: 2
+                    red: 0.0
+                    green: 1.0
+                    blue: 0.0
+                    color_brightness:  !lambda |-
+                      return id(sun_elevation).state > 0 ? 1.0 : 0.5;
+  - platform: homeassistant
+    id: sun_elevation
+    entity_id: sun.sun
+    attribute: elevation
+
+switch:
+  - platform: gpio
+    pin: 12
+    id: fan
+    restore_mode: ALWAYS_ON
+    disabled_by_default: true
+    entity_category: diagnostic
+    
+  - platform: template
+    entity_category: diagnostic
+    disabled_by_default: true
+    id: fan_delay
+    turn_on_action:
+      - switch.turn_off: fan
+      - delay: 50s # cas o 10 sekund kratsi, nez je update_interval senzoru pm1006
+      - switch.turn_on: fan
+  
+light:
+  - platform: neopixelbus
+    type: GRB
+    variant: WS2812
+    pin: GPIO25
+    num_leds: 3
+    id: status_led
+    restore_mode: ALWAYS_ON
+    method:
+      type: esp32_rmt
+      channel: 6
+
+i2c:
+  sda: 21
+  scl: 22
+  scan: true
+  id: bus_a
+
