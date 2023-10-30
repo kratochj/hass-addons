@@ -31,3 +31,10 @@ sensor:
       name: "Meteo Station Humidity"
     address: 0x77
     update_interval: 60s
+  - platform: adc
+    # divider ratio = 1.7693877551
+    pin: GPIO0
+    name: "Meteo Station Batery Level"
+    entity_category: diagnostic   
+    filters:
+      - multiply: 1.7693877551
