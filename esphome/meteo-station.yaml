@@ -1,0 +1,33 @@
+substitutions:
+  device_name: meteo-station
+
+packages:
+  wifi: !include common/wifi.yaml
+  device_base: !include common/device_base.yaml
+
+esphome:
+  name: meteo-station
+  friendly_name: LaskaKit Meteo Mini
+
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: arduino
+
+i2c:
+  sda: 19
+  scl: 18
+  scan: true
+  id: bus_a
+
+sensor:
+  - platform: bme280
+    temperature:
+      name: "Meteo Station Temperature"
+      oversampling: 16x
+    pressure:
+      name: "Meteo Station Pressure"
+    humidity:
+      name: "Meteo Station Humidity"
+    address: 0x77
+    update_interval: 60s
