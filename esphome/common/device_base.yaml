@@ -15,3 +15,9 @@ binary_sensor:
 
 switch:
   - <<: !include switch/restart_switch.config.yaml
+
+web_server:
+  port: 80
+  auth:
+    username: !secret web_username
+    password: !secret web_password
